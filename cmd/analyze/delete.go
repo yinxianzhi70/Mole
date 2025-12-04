@@ -56,14 +56,19 @@ func deletePathWithProgress(root string, counter *int64) (int64, error) {
 		return nil
 	})
 
-	if err != nil {
-		return count, err
+	// Track walk error separately
+	if err != nil && firstErr == nil {
+		firstErr = err
 	}
 
-	if err := os.RemoveAll(root); err != nil {
-		return count, err
+	// Try to remove remaining directory structure
+	// Even if this fails, we still report files deleted
+	if removeErr := os.RemoveAll(root); removeErr != nil {
+		if firstErr == nil {
+			firstErr = removeErr
+		}
 	}
 
-	// Return the first error encountered during deletion if any
+	// Always return count (even if there were errors), along with first error
 	return count, firstErr
 }

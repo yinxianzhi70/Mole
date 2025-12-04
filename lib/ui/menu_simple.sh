@@ -109,6 +109,7 @@ paginated_multi_select() {
     }
 
     # Interrupt handler
+    # shellcheck disable=SC2329
     handle_interrupt() {
         cleanup
         exit 130 # Standard exit code for Ctrl+C
@@ -129,6 +130,7 @@ paginated_multi_select() {
     hide_cursor
 
     # Helper functions
+    # shellcheck disable=SC2329
     print_line() { printf "\r\033[2K%s\n" "$1" >&2; }
 
     render_item() {
@@ -137,7 +139,7 @@ paginated_multi_select() {
         [[ ${selected[idx]} == true ]] && checkbox="$ICON_SOLID"
 
         if [[ $is_current == true ]]; then
-            printf "\r\033[2K${BLUE}${ICON_ARROW} %s %s${NC}\n" "$checkbox" "${items[idx]}" >&2
+            printf "\r\033[2K${CYAN}${ICON_ARROW} %s %s${NC}\n" "$checkbox" "${items[idx]}" >&2
         else
             printf "\r\033[2K  %s %s\n" "$checkbox" "${items[idx]}" >&2
         fi
@@ -161,7 +163,7 @@ paginated_multi_select() {
         done
 
         # Header
-        printf "${clear_line}${PURPLE}%s${NC}  ${GRAY}%d/%d selected${NC}\n" "${title}" "$selected_count" "$total_items" >&2
+        printf "${clear_line}${PURPLE_BOLD}%s${NC}  ${GRAY}%d/%d selected${NC}\n" "${title}" "$selected_count" "$total_items" >&2
 
         if [[ $total_items -eq 0 ]]; then
             printf "${clear_line}${GRAY}No items available${NC}\n" >&2

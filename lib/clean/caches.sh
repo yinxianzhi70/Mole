@@ -44,7 +44,7 @@ check_tcc_permissions() {
         # Trigger all TCC prompts upfront by accessing each directory
         # Using find -maxdepth 1 ensures we touch the directory without deep scanning
         for dir in "${tcc_dirs[@]}"; do
-            [[ -d "$dir" ]] && find "$dir" -maxdepth 1 -type d > /dev/null 2>&1
+            [[ -d "$dir" ]] && command find "$dir" -maxdepth 1 -type d > /dev/null 2>&1
         done
 
         stop_inline_spinner
@@ -75,7 +75,7 @@ clean_service_worker_cache() {
         # Pattern matches: letters/numbers, hyphens, then dot, then TLD
         # Example: "abc123_https_example.com_0" → "example.com"
         local domain=$(basename "$cache_dir" | grep -oE '[a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}' | head -1 || echo "")
-        local size=$(du -sk "$cache_dir" 2> /dev/null | awk '{print $1}')
+        local size=$(get_path_size_kb "$cache_dir")
 
         # Check if domain is protected
         local is_protected=false
@@ -94,7 +94,7 @@ clean_service_worker_cache() {
             fi
             cleaned_size=$((cleaned_size + size))
         fi
-    done < <(find "$cache_path" -type d -depth 2 2> /dev/null)
+    done < <(command find "$cache_path" -type d -depth 2 2> /dev/null)
 
     if [[ $cleaned_size -gt 0 ]]; then
         local cleaned_mb=$((cleaned_size / 1024))
@@ -120,7 +120,7 @@ clean_project_caches() {
     local nextjs_tmp_file
     nextjs_tmp_file=$(create_temp_file)
     (
-        find "$HOME" -P -mount -type d -name ".next" -maxdepth 3 \
+        command find "$HOME" -P -mount -type d -name ".next" -maxdepth 3 \
             -not -path "*/Library/*" \
             -not -path "*/.Trash/*" \
             -not -path "*/node_modules/*" \
@@ -164,7 +164,7 @@ clean_project_caches() {
     local pycache_tmp_file
     pycache_tmp_file=$(create_temp_file)
     (
-        find "$HOME" -P -mount -type d -name "__pycache__" -maxdepth 3 \
+        command find "$HOME" -P -mount -type d -name "__pycache__" -maxdepth 3 \
             -not -path "*/Library/*" \
             -not -path "*/.Trash/*" \
             -not -path "*/node_modules/*" \

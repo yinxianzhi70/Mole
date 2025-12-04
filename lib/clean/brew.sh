@@ -34,6 +34,8 @@ clean_orphaned_casks() {
     else
         # Rebuild cache: query all installed casks and extract app names
         mkdir -p "$cache_dir"
+        # Remove stale cache if it exists but has permission issues
+        rm -f "$cask_cache" 2> /dev/null || true
         true > "$cask_cache"
 
         while IFS= read -r cask; do

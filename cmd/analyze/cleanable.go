@@ -59,17 +59,17 @@ var projectDependencyDirs = map[string]bool{
 	".pnpm-store":      true, // pnpm store
 
 	// Python dependencies and outputs
-	"venv":                 true,
-	".venv":                true,
-	"virtualenv":           true,
-	"__pycache__":          true,
-	".pytest_cache":        true,
-	".mypy_cache":          true,
-	".ruff_cache":          true,
-	".tox":                 true,
-	".eggs":                true,
-	"htmlcov":              true, // Coverage reports
-	".ipynb_checkpoints":   true, // Jupyter checkpoints
+	"venv":               true,
+	".venv":              true,
+	"virtualenv":         true,
+	"__pycache__":        true,
+	".pytest_cache":      true,
+	".mypy_cache":        true,
+	".ruff_cache":        true,
+	".tox":               true,
+	".eggs":              true,
+	"htmlcov":            true, // Coverage reports
+	".ipynb_checkpoints": true, // Jupyter checkpoints
 
 	// Ruby dependencies
 	"vendor":  true,
@@ -95,10 +95,10 @@ var projectDependencyDirs = map[string]bool{
 	".nyc_output":   true, // NYC coverage
 
 	// Frontend framework outputs
-	".angular":     true, // Angular CLI cache
-	".svelte-kit":  true, // SvelteKit build
-	".astro":       true, // Astro cache
-	".docusaurus":  true, // Docusaurus build
+	".angular":    true, // Angular CLI cache
+	".svelte-kit": true, // SvelteKit build
+	".astro":      true, // Astro cache
+	".docusaurus": true, // Docusaurus build
 
 	// iOS/macOS development
 	"DerivedData": true,

@@ -19,10 +19,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source common functions
-source "$SCRIPT_DIR/lib/common.sh"
+source "$SCRIPT_DIR/lib/core/common.sh"
 
 # Version info
-VERSION="1.11.2"
+VERSION="1.11.23"
 MOLE_TAGLINE="can dig deep to clean your Mac."
 
 # Check if Touch ID is already configured
@@ -38,13 +38,17 @@ get_latest_version() {
         grep '^VERSION=' | head -1 | sed 's/VERSION="\(.*\)"/\1/'
 }
 
-# Get latest version from Homebrew for brew-installed Mole
-get_latest_brew_version() {
-    if ! command -v brew > /dev/null 2>&1; then
-        return 1
-    fi
-
-    brew info --json=v2 mole 2> /dev/null | grep -o '"version":"[^"]*"' | head -1 | sed 's/"version":"\(.*\)"/\1/'
+# Get latest version from GitHub API
+# This works for both Homebrew and manual installs since versions are synced
+get_latest_version_from_github() {
+    local version
+    version=$(curl -fsSL --connect-timeout 2 --max-time 3 \
+        "https://api.github.com/repos/tw93/mole/releases/latest" 2> /dev/null |
+        grep '"tag_name"' | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+    # Remove 'v' or 'V' prefix if present
+    version="${version#v}"
+    version="${version#V}"
+    echo "$version"
 }
 
 # Check if installed via Homebrew
@@ -52,38 +56,27 @@ is_homebrew_install() {
     command -v brew > /dev/null 2>&1 && brew list mole > /dev/null 2>&1
 }
 
-# Check for updates (non-blocking, cached)
+# Check for updates (non-blocking, always check in background)
 check_for_updates() {
-    local cache="$HOME/.cache/mole/version_check"
     local msg_cache="$HOME/.cache/mole/update_message"
     local debug_log="$HOME/.cache/mole/update_check_debug"
-    local ttl="${MO_UPDATE_CHECK_TTL:-3600}"
-    mkdir -p "$(dirname "$cache")" 2> /dev/null
-
-    # Skip if checked recently
-    if [[ -f "$cache" ]]; then
-        local age=$(($(date +%s) - $(stat -f%m "$cache" 2> /dev/null || echo 0)))
-        [[ $age -lt $ttl ]] && return
-    fi
+    mkdir -p "$(dirname "$msg_cache")" 2> /dev/null
 
     # Background version check (save to file, don't output)
+    # Always check in background, display result from previous check
     (
         local latest
-        local check_method=""
+        local check_method="github"
 
-        # For Homebrew installations, check Homebrew version
-        if is_homebrew_install; then
-            latest=$(get_latest_brew_version)
-            check_method="brew"
-            [[ -n "${MO_UPDATE_DEBUG:-}" ]] && echo "$(date): Checking via Homebrew, got: $latest" >> "$debug_log"
-        fi
-
-        # Fallback to GitHub for non-brew or if brew check failed
+        # Use GitHub API for version check (works for both Homebrew and manual installs)
+        # Try API first (faster and more reliable)
+        latest=$(get_latest_version_from_github)
         if [[ -z "$latest" ]]; then
+            # Fallback to parsing mole script from raw GitHub
             latest=$(get_latest_version)
-            check_method="github"
-            [[ -n "${MO_UPDATE_DEBUG:-}" ]] && echo "$(date): Checking via GitHub, got: $latest" >> "$debug_log"
+            check_method="github-raw"
         fi
+        [[ -n "${MO_UPDATE_DEBUG:-}" ]] && echo "$(date): Checking via $check_method, got: $latest" >> "$debug_log"
 
         if [[ -n "$latest" && "$VERSION" != "$latest" && "$(printf '%s\n' "$VERSION" "$latest" | sort -V | head -1)" == "$VERSION" ]]; then
             printf "\nUpdate available: %s → %s, run %smo update%s\n\n" "$VERSION" "$latest" "$GREEN" "$NC" > "$msg_cache"
@@ -92,7 +85,6 @@ check_for_updates() {
             echo -n > "$msg_cache"
             [[ -n "${MO_UPDATE_DEBUG:-}" ]] && echo "$(date): No update needed ($check_method): $VERSION == $latest" >> "$debug_log"
         fi
-        touch "$cache" 2> /dev/null
     ) &
     disown 2> /dev/null || true
 }
@@ -198,7 +190,9 @@ update_mole() {
 
     # Check for updates
     local latest
-    latest=$(get_latest_version)
+    latest=$(get_latest_version_from_github)
+    # Fallback to raw GitHub if API fails
+    [[ -z "$latest" ]] && latest=$(get_latest_version)
 
     if [[ -z "$latest" ]]; then
         log_error "Unable to check for updates. Check network connection."
@@ -334,7 +328,7 @@ update_mole() {
     fi
 
     rm -f "$tmp_installer"
-    rm -f "$HOME/.cache/mole/version_check" "$HOME/.cache/mole/update_message"
+    rm -f "$HOME/.cache/mole/update_message"
 }
 
 # Remove Mole from system
@@ -703,7 +697,6 @@ main() {
             ;;
         "remove")
             remove_mole
-            exit 0
             ;;
         "help" | "--help" | "-h")
             show_help

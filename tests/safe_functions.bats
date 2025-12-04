@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Tests for safe_* functions in lib/common.sh
+# Tests for safe_* functions in lib/core/common.sh
 
 setup_file() {
     PROJECT_ROOT="$(cd "${BATS_TEST_DIRNAME}/.." && pwd)"
@@ -22,7 +22,7 @@ teardown_file() {
 }
 
 setup() {
-    source "$PROJECT_ROOT/lib/common.sh"
+    source "$PROJECT_ROOT/lib/core/common.sh"
     TEST_DIR="$HOME/test_safe_functions"
     mkdir -p "$TEST_DIR"
 }
@@ -33,39 +33,39 @@ teardown() {
 
 # Test validate_path_for_deletion
 @test "validate_path_for_deletion rejects empty path" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion ''"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion ''"
     [ "$status" -eq 1 ]
 }
 
 @test "validate_path_for_deletion rejects relative path" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion 'relative/path'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion 'relative/path'"
     [ "$status" -eq 1 ]
 }
 
 @test "validate_path_for_deletion rejects path traversal" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion '/tmp/../etc'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion '/tmp/../etc'"
     [ "$status" -eq 1 ]
 }
 
 @test "validate_path_for_deletion rejects system directories" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion '/System'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion '/System'"
     [ "$status" -eq 1 ]
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion '/usr/bin'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion '/usr/bin'"
     [ "$status" -eq 1 ]
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion '/etc'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion '/etc'"
     [ "$status" -eq 1 ]
 }
 
 @test "validate_path_for_deletion accepts valid path" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; validate_path_for_deletion '$TEST_DIR/valid'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; validate_path_for_deletion '$TEST_DIR/valid'"
     [ "$status" -eq 0 ]
 }
 
 # Test safe_remove
 @test "safe_remove validates path before deletion" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_remove '/System/test' 2>&1"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_remove '/System/test' 2>&1"
     [ "$status" -eq 1 ]
 }
 
@@ -73,7 +73,7 @@ teardown() {
     local test_file="$TEST_DIR/test_file.txt"
     echo "test" > "$test_file"
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_remove '$test_file' true"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_remove '$test_file' true"
     [ "$status" -eq 0 ]
     [ ! -f "$test_file" ]
 }
@@ -83,19 +83,19 @@ teardown() {
     mkdir -p "$test_subdir"
     touch "$test_subdir/file.txt"
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_remove '$test_subdir' true"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_remove '$test_subdir' true"
     [ "$status" -eq 0 ]
     [ ! -d "$test_subdir" ]
 }
 
 @test "safe_remove handles non-existent path gracefully" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_remove '$TEST_DIR/nonexistent' true"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_remove '$TEST_DIR/nonexistent' true"
     [ "$status" -eq 0 ]
 }
 
 @test "safe_remove in silent mode suppresses error output" {
     # Try to remove system directory in silent mode
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_remove '/System/test' true 2>&1"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_remove '/System/test' true 2>&1"
     [ "$status" -eq 1 ]
     # Should not output error in silent mode
 }
@@ -103,7 +103,7 @@ teardown() {
 
 # Test safe_find_delete
 @test "safe_find_delete validates base directory" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_find_delete '/nonexistent' '*.tmp' 7 'f' 2>&1"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_find_delete '/nonexistent' '*.tmp' 7 'f' 2>&1"
     [ "$status" -eq 1 ]
 }
 
@@ -113,7 +113,7 @@ teardown() {
     mkdir -p "$real_dir"
     ln -s "$real_dir" "$link_dir"
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_find_delete '$link_dir' '*.tmp' 7 'f' 2>&1"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_find_delete '$link_dir' '*.tmp' 7 'f' 2>&1"
     [ "$status" -eq 1 ]
     [[ "$output" == *"symlink"* ]]
 
@@ -121,7 +121,7 @@ teardown() {
 }
 
 @test "safe_find_delete validates type filter" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_find_delete '$TEST_DIR' '*.tmp' 7 'x' 2>&1"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_find_delete '$TEST_DIR' '*.tmp' 7 'x' 2>&1"
     [ "$status" -eq 1 ]
     [[ "$output" == *"Invalid type filter"* ]]
 }
@@ -137,21 +137,21 @@ teardown() {
     # Make old_file 8 days old (requires touch -t)
     touch -t "$(date -v-8d '+%Y%m%d%H%M.%S' 2>/dev/null || date -d '8 days ago' '+%Y%m%d%H%M.%S')" "$old_file" 2>/dev/null || true
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; safe_find_delete '$TEST_DIR' '*.tmp' 7 'f'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; safe_find_delete '$TEST_DIR' '*.tmp' 7 'f'"
     [ "$status" -eq 0 ]
 }
 
 # Test MOLE constants are defined
 @test "MOLE_* constants are defined" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; echo \$MOLE_TEMP_FILE_AGE_DAYS"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; echo \$MOLE_TEMP_FILE_AGE_DAYS"
     [ "$status" -eq 0 ]
     [ "$output" = "7" ]
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; echo \$MOLE_MAX_PARALLEL_JOBS"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; echo \$MOLE_MAX_PARALLEL_JOBS"
     [ "$status" -eq 0 ]
     [ "$output" = "15" ]
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; echo \$MOLE_TM_BACKUP_SAFE_HOURS"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; echo \$MOLE_TM_BACKUP_SAFE_HOURS"
     [ "$status" -eq 0 ]
     [ "$output" = "48" ]
 }

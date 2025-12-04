@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
@@ -33,6 +34,7 @@ func snapshotFromModel(m model) historyEntry {
 		EntryOffset:   m.offset,
 		LargeSelected: m.largeSelected,
 		LargeOffset:   m.largeOffset,
+		IsOverview:    m.isOverview,
 	}
 }
 
@@ -290,7 +292,7 @@ func removeOverviewSnapshot(path string) {
 
 // prefetchOverviewCache scans overview directories in background
 // to populate cache for faster overview mode access
-func prefetchOverviewCache() {
+func prefetchOverviewCache(ctx context.Context) {
 	entries := createOverviewEntries()
 
 	// Check which entries need refresh
@@ -308,8 +310,15 @@ func prefetchOverviewCache() {
 		return
 	}
 
-	// Scan and cache in background
+	// Scan and cache in background with context cancellation support
 	for _, path := range needScan {
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
 		size, err := measureOverviewSize(path)
 		if err == nil && size > 0 {
 			_ = storeOverviewSize(path, size)

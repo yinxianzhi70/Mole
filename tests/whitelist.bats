@@ -28,7 +28,7 @@ setup() {
 
 @test "patterns_equivalent treats paths with tilde expansion as equal" {
     local status
-    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; patterns_equivalent '~/.cache/test' \"\$HOME/.cache/test\""; then
+    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; patterns_equivalent '~/.cache/test' \"\$HOME/.cache/test\""; then
         status=0
     else
         status=$?
@@ -38,7 +38,7 @@ setup() {
 
 @test "patterns_equivalent distinguishes different paths" {
     local status
-    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; patterns_equivalent '~/.cache/test' \"\$HOME/.cache/other\""; then
+    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; patterns_equivalent '~/.cache/test' \"\$HOME/.cache/other\""; then
         status=0
     else
         status=$?
@@ -47,7 +47,7 @@ setup() {
 }
 
 @test "save_whitelist_patterns keeps unique entries and preserves header" {
-    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; save_whitelist_patterns \"\$HOME/.cache/foo\" \"\$HOME/.cache/foo\" \"\$HOME/.cache/bar\""
+    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; save_whitelist_patterns \"\$HOME/.cache/foo\" \"\$HOME/.cache/foo\" \"\$HOME/.cache/bar\""
 
     [[ -f "$WHITELIST_PATH" ]]
 
@@ -64,8 +64,8 @@ setup() {
 
 @test "load_whitelist falls back to defaults when config missing" {
     rm -f "$WHITELIST_PATH"
-    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; rm -f \"\$HOME/.config/mole/whitelist\"; load_whitelist; printf '%s\n' \"\${CURRENT_WHITELIST_PATTERNS[@]}\"" > "$HOME/current_whitelist.txt"
-    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; printf '%s\n' \"\${DEFAULT_WHITELIST_PATTERNS[@]}\"" > "$HOME/default_whitelist.txt"
+    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; rm -f \"\$HOME/.config/mole/whitelist\"; load_whitelist; printf '%s\n' \"\${CURRENT_WHITELIST_PATTERNS[@]}\"" > "$HOME/current_whitelist.txt"
+    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; printf '%s\n' \"\${DEFAULT_WHITELIST_PATTERNS[@]}\"" > "$HOME/default_whitelist.txt"
 
     current=()
     while IFS= read -r line; do
@@ -83,14 +83,14 @@ setup() {
 
 @test "is_whitelisted matches saved patterns exactly" {
     local status
-    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; save_whitelist_patterns \"\$HOME/.cache/unique-pattern\"; load_whitelist; is_whitelisted \"\$HOME/.cache/unique-pattern\""; then
+    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; save_whitelist_patterns \"\$HOME/.cache/unique-pattern\"; load_whitelist; is_whitelisted \"\$HOME/.cache/unique-pattern\""; then
         status=0
     else
         status=$?
     fi
     [ "$status" -eq 0 ]
 
-    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/whitelist_manager.sh'; save_whitelist_patterns \"\$HOME/.cache/unique-pattern\"; load_whitelist; is_whitelisted \"\$HOME/.cache/other-pattern\""; then
+    if HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/manage/whitelist.sh'; save_whitelist_patterns \"\$HOME/.cache/unique-pattern\"; load_whitelist; is_whitelisted \"\$HOME/.cache/other-pattern\""; then
         status=0
     else
         status=$?

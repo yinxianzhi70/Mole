@@ -87,10 +87,10 @@ func scanPathConcurrent(root string, filesScanned, dirsScanned, bytesScanned *in
 			atomic.AddInt64(&total, size)
 
 			entryChan <- dirEntry{
-				Name:       child.Name() + " →",  // Add arrow to indicate symlink
+				Name:       child.Name() + " →", // Add arrow to indicate symlink
 				Path:       fullPath,
 				Size:       size,
-				IsDir:      false,  // Don't allow navigation into symlinks
+				IsDir:      false, // Don't allow navigation into symlinks
 				LastAccess: getLastAccessTimeFromInfo(info),
 			}
 			continue
@@ -189,10 +189,14 @@ func scanPathConcurrent(root string, filesScanned, dirsScanned, bytesScanned *in
 		entries = entries[:maxEntries]
 	}
 
-	// Try to use Spotlight for faster large file discovery
+	// Try to use Spotlight (mdfind) for faster large file discovery
+	// This is a performance optimization that gracefully falls back to scan results
+	// if Spotlight is unavailable or fails. The fallback is intentionally silent
+	// because users only care about correct results, not the method used.
 	if spotlightFiles := findLargeFilesWithSpotlight(root, minLargeFileSize); len(spotlightFiles) > 0 {
 		largeFiles = spotlightFiles
 	} else {
+		// Use files collected during scanning (fallback path)
 		// Sort and trim large files collected from scanning
 		sort.Slice(largeFiles, func(i, j int) bool {
 			return largeFiles[i].Size > largeFiles[j].Size

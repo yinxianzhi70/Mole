@@ -24,8 +24,8 @@ teardown_file() {
 }
 
 setup() {
-    source "$PROJECT_ROOT/lib/common.sh"
-    source "$PROJECT_ROOT/lib/clean_caches.sh"
+    source "$PROJECT_ROOT/lib/core/common.sh"
+    source "$PROJECT_ROOT/lib/clean/caches.sh"
 
     # Clean permission flag for each test
     rm -f "$HOME/.cache/mole/permissions_granted"
@@ -34,7 +34,7 @@ setup() {
 # Test check_tcc_permissions in non-interactive mode
 @test "check_tcc_permissions skips in non-interactive mode" {
     # Redirect stdin to simulate non-TTY
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; source '$PROJECT_ROOT/lib/clean_caches.sh'; check_tcc_permissions" < /dev/null
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; source '$PROJECT_ROOT/lib/clean/caches.sh'; check_tcc_permissions" < /dev/null
     [ "$status" -eq 0 ]
     # Should not create permission flag in non-interactive mode
     [[ ! -f "$HOME/.cache/mole/permissions_granted" ]]
@@ -47,7 +47,7 @@ setup() {
     touch "$HOME/.cache/mole/permissions_granted"
 
     # Even in TTY mode, should skip if flag exists
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; source '$PROJECT_ROOT/lib/clean_caches.sh'; [[ -t 1 ]] || true; check_tcc_permissions"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; source '$PROJECT_ROOT/lib/clean/caches.sh'; [[ -t 1 ]] || true; check_tcc_permissions"
     [ "$status" -eq 0 ]
 }
 
@@ -66,13 +66,13 @@ setup() {
     [[ -d "$HOME/.cache/mole" ]]
 
     # Function should handle missing directories gracefully
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; source '$PROJECT_ROOT/lib/clean_caches.sh'; check_tcc_permissions < /dev/null"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; source '$PROJECT_ROOT/lib/clean/caches.sh'; check_tcc_permissions < /dev/null"
     [ "$status" -eq 0 ]
 }
 
 # Test clean_service_worker_cache with non-existent path
 @test "clean_service_worker_cache returns early when path doesn't exist" {
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; source '$PROJECT_ROOT/lib/clean_caches.sh'; clean_service_worker_cache 'TestBrowser' '/nonexistent/path'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; source '$PROJECT_ROOT/lib/clean/caches.sh'; clean_service_worker_cache 'TestBrowser' '/nonexistent/path'"
     [ "$status" -eq 0 ]
 }
 
@@ -81,7 +81,7 @@ setup() {
     local test_cache="$HOME/test_sw_cache"
     mkdir -p "$test_cache"
 
-    run bash -c "source '$PROJECT_ROOT/lib/common.sh'; source '$PROJECT_ROOT/lib/clean_caches.sh'; clean_service_worker_cache 'TestBrowser' '$test_cache'"
+    run bash -c "source '$PROJECT_ROOT/lib/core/common.sh'; source '$PROJECT_ROOT/lib/clean/caches.sh'; clean_service_worker_cache 'TestBrowser' '$test_cache'"
     [ "$status" -eq 0 ]
 
     rm -rf "$test_cache"
@@ -100,8 +100,8 @@ setup() {
     run bash -c "
         export DRY_RUN=true
         export PROTECTED_SW_DOMAINS=(capcut.com photopea.com)
-        source '$PROJECT_ROOT/lib/common.sh'
-        source '$PROJECT_ROOT/lib/clean_caches.sh'
+        source '$PROJECT_ROOT/lib/core/common.sh'
+        source '$PROJECT_ROOT/lib/clean/caches.sh'
         clean_service_worker_cache 'TestBrowser' '$test_cache'
     "
     [ "$status" -eq 0 ]
@@ -124,8 +124,8 @@ setup() {
 
     run bash -c "
         export DRY_RUN=true
-        source '$PROJECT_ROOT/lib/common.sh'
-        source '$PROJECT_ROOT/lib/clean_caches.sh'
+        source '$PROJECT_ROOT/lib/core/common.sh'
+        source '$PROJECT_ROOT/lib/clean/caches.sh'
         clean_project_caches
     "
     [ "$status" -eq 0 ]
@@ -147,8 +147,8 @@ setup() {
 
     # Should complete within reasonable time even with slow find
     run timeout 15 bash -c "
-        source '$PROJECT_ROOT/lib/common.sh'
-        source '$PROJECT_ROOT/lib/clean_caches.sh'
+        source '$PROJECT_ROOT/lib/core/common.sh'
+        source '$PROJECT_ROOT/lib/clean/caches.sh'
         clean_project_caches
     "
     # Either succeeds or times out gracefully (both acceptable)
@@ -168,8 +168,8 @@ setup() {
     # We can't easily test this without mocking, but we can verify no crashes
     run bash -c "
         export DRY_RUN=true
-        source '$PROJECT_ROOT/lib/common.sh'
-        source '$PROJECT_ROOT/lib/clean_caches.sh'
+        source '$PROJECT_ROOT/lib/core/common.sh'
+        source '$PROJECT_ROOT/lib/clean/caches.sh'
         clean_project_caches
     "
     [ "$status" -eq 0 ]

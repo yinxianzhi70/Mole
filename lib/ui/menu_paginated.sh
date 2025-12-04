@@ -129,7 +129,7 @@ paginated_multi_select() {
         for ((i = 0; i < len; i++)); do
             c="${s:i:1}"
             case "$c" in
-                '\' | '*' | '?' | '[' | ']') out+="\\$c" ;;
+                $'\\' | '*' | '?' | '[' | ']') out+="\\$c" ;;
                 *) out+="$c" ;;
             esac
         done
@@ -196,6 +196,7 @@ paginated_multi_select() {
     }
 
     # Interrupt handler
+    # shellcheck disable=SC2329
     handle_interrupt() {
         cleanup
         exit 130 # Standard exit code for Ctrl+C
@@ -216,6 +217,7 @@ paginated_multi_select() {
     hide_cursor
 
     # Helper functions
+    # shellcheck disable=SC2329
     print_line() { printf "\r\033[2K%s\n" "$1" >&2; }
 
     # Print footer lines wrapping only at separators
@@ -366,7 +368,7 @@ paginated_multi_select() {
         [[ ${selected[real]} == true ]] && checkbox="$ICON_SOLID"
 
         if [[ $is_current == true ]]; then
-            printf "\r\033[2K${BLUE}${ICON_ARROW} %s %s${NC}\n" "$checkbox" "${items[real]}" >&2
+            printf "\r\033[2K${CYAN}${ICON_ARROW} %s %s${NC}\n" "$checkbox" "${items[real]}" >&2
         else
             printf "\r\033[2K  %s %s\n" "$checkbox" "${items[real]}" >&2
         fi
@@ -387,7 +389,7 @@ paginated_multi_select() {
         done
 
         # Header only
-        printf "${clear_line}${PURPLE}%s${NC}  ${GRAY}%d/%d selected${NC}\n" "${title}" "$selected_count" "$total_items" >&2
+        printf "${clear_line}${PURPLE_BOLD}%s${NC}  ${GRAY}%d/%d selected${NC}\n" "${title}" "$selected_count" "$total_items" >&2
 
         # Visible slice
         local visible_total=${#view_indices[@]}

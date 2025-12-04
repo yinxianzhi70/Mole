@@ -115,7 +115,7 @@ func coloredProgressBar(value, max int64, percent float64) string {
 	} else if percent >= 20 {
 		barColor = colorYellow
 	} else if percent >= 5 {
-		barColor = colorCyan
+		barColor = colorBlue
 	} else {
 		barColor = colorGreen
 	}

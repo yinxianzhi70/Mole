@@ -4,24 +4,20 @@ set -euo pipefail
 
 # Load common functions
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$SCRIPT_DIR/lib/common.sh"
-source "$SCRIPT_DIR/lib/optimize_health.sh"
-source "$SCRIPT_DIR/lib/sudo_manager.sh"
-source "$SCRIPT_DIR/lib/update_manager.sh"
-source "$SCRIPT_DIR/lib/autofix_manager.sh"
-source "$SCRIPT_DIR/lib/optimization_tasks.sh"
+source "$SCRIPT_DIR/lib/core/common.sh"
+source "$SCRIPT_DIR/lib/core/sudo.sh"
+source "$SCRIPT_DIR/lib/manage/update.sh"
+source "$SCRIPT_DIR/lib/manage/autofix.sh"
+source "$SCRIPT_DIR/lib/optimize/tasks.sh"
 
 # Load check modules
-source "$SCRIPT_DIR/lib/check_updates.sh"
-source "$SCRIPT_DIR/lib/check_health.sh"
-source "$SCRIPT_DIR/lib/check_security.sh"
-source "$SCRIPT_DIR/lib/check_config.sh"
+source "$SCRIPT_DIR/lib/check/all.sh"
 
 # Colors and icons from common.sh
 
 print_header() {
     printf '\n'
-    echo -e "${PURPLE}Optimize and Check${NC}"
+    echo -e "${PURPLE_BOLD}Optimize and Check${NC}"
     echo ""
 }
 
@@ -29,7 +25,7 @@ print_header() {
 run_system_checks() {
     unset AUTO_FIX_SUMMARY AUTO_FIX_DETAILS
     echo ""
-    echo -e "${PURPLE}System Check${NC}"
+    echo -e "${PURPLE_BOLD}System Check${NC}"
     echo ""
 
     # Check updates - real-time display
@@ -183,7 +179,7 @@ cleanup_path() {
     fi
 
     local size_kb
-    size_kb=$(du -sk "$expanded_path" 2> /dev/null | awk '{print $1}' || echo "0")
+    size_kb=$(get_path_size_kb "$expanded_path")
     local size_display=""
     if [[ "$size_kb" =~ ^[0-9]+$ && "$size_kb" -gt 0 ]]; then
         size_display=$(bytes_to_human "$((size_kb * 1024))")

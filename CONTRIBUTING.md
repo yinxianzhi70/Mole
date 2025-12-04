@@ -50,11 +50,27 @@ Config: `.editorconfig` and `.shellcheckrc`
 
 ## Go Components
 
-`mo status` and `mo analyze` use Go for the interactive dashboards.
+`mo status` and `mo analyze` use Go with Bubble Tea for interactive dashboards.
+
+**Code organization:**
+
+- Each module split into focused files by responsibility
+- `cmd/analyze/` - Disk analyzer with 7 files under 500 lines each
+- `cmd/status/` - System monitor with metrics split into 11 domain files
+
+**Development workflow:**
 
 - Format code with `gofmt -w ./cmd/...`
-- Run `go test ./cmd/...` before submitting Go changes (ensures packages compile)
-- Build universal binaries locally via `./scripts/build-status.sh` and `./scripts/build-analyze.sh`
+- Run `go vet ./cmd/...` to check for issues
+- Build with `go build ./...` to verify all packages compile
+- Build universal binaries via `./scripts/build-status.sh` and `./scripts/build-analyze.sh`
+
+**Guidelines:**
+
+- Keep files focused on single responsibility
+- Extract constants instead of magic numbers
+- Use context for timeout control on external commands
+- Add comments explaining why, not what
 
 ## Pull Requests
 

@@ -4,7 +4,7 @@ set -euo pipefail
 
 # Ensure common.sh is loaded
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-[[ -z "${MOLE_COMMON_LOADED:-}" ]] && source "$SCRIPT_DIR/lib/common.sh"
+[[ -z "${MOLE_COMMON_LOADED:-}" ]] && source "$SCRIPT_DIR/lib/core/common.sh"
 
 # Batch uninstall functionality with minimal confirmations
 # Replaces the overly verbose individual confirmation approach
@@ -42,12 +42,67 @@ decode_file_list() {
     echo "$decoded"
     return 0
 }
-# Note: find_app_files() and calculate_total_size() functions now in lib/common.sh
+# Note: find_app_files() and calculate_total_size() functions now in lib/core/common.sh
+
+# Stop Launch Agents and Daemons for an app
+# Args: $1 = bundle_id, $2 = has_system_files (true/false)
+stop_launch_services() {
+    local bundle_id="$1"
+    local has_system_files="${2:-false}"
+
+    # User-level Launch Agents
+    for plist in ~/Library/LaunchAgents/"$bundle_id"*.plist; do
+        [[ -f "$plist" ]] && launchctl unload "$plist" 2> /dev/null || true
+    done
+
+    # System-level services (requires sudo)
+    if [[ "$has_system_files" == "true" ]]; then
+        for plist in /Library/LaunchAgents/"$bundle_id"*.plist; do
+            [[ -f "$plist" ]] && sudo launchctl unload "$plist" 2> /dev/null || true
+        done
+        for plist in /Library/LaunchDaemons/"$bundle_id"*.plist; do
+            [[ -f "$plist" ]] && sudo launchctl unload "$plist" 2> /dev/null || true
+        done
+    fi
+}
+
+# Remove a list of files (handles both regular files and symlinks)
+# Args: $1 = file_list (newline-separated), $2 = use_sudo (true/false)
+# Returns: number of files removed
+remove_file_list() {
+    local file_list="$1"
+    local use_sudo="${2:-false}"
+    local count=0
+
+    while IFS= read -r file; do
+        [[ -n "$file" && -e "$file" ]] || continue
+
+        if [[ -L "$file" ]]; then
+            # Symlink: use direct rm
+            if [[ "$use_sudo" == "true" ]]; then
+                sudo rm "$file" 2> /dev/null && ((count++)) || true
+            else
+                rm "$file" 2> /dev/null && ((count++)) || true
+            fi
+        else
+            # Regular file/directory: use safe_remove
+            if [[ "$use_sudo" == "true" ]]; then
+                safe_sudo_remove "$file" && ((count++)) || true
+            else
+                safe_remove "$file" true && ((count++)) || true
+            fi
+        fi
+    done <<< "$file_list"
+
+    echo "$count"
+}
 
 # Batch uninstall with single confirmation
+# Globals: selected_apps (read) - array of selected applications
 batch_uninstall_applications() {
     local total_size_freed=0
 
+    # shellcheck disable=SC2154
     if [[ ${#selected_apps[@]} -eq 0 ]]; then
         log_warning "No applications selected for uninstallation"
         return 0
@@ -65,8 +120,13 @@ batch_uninstall_applications() {
         [[ -z "$selected_app" ]] && continue
         IFS='|' read -r _ app_path app_name bundle_id _ _ <<< "$selected_app"
 
-        # Check if app is running (use app path for precise matching)
-        if pgrep -f "$app_path" > /dev/null 2>&1; then
+        # Check if app is running using executable name from bundle
+        local exec_name=""
+        if [[ -e "$app_path/Contents/Info.plist" ]]; then
+            exec_name=$(defaults read "$app_path/Contents/Info.plist" CFBundleExecutable 2> /dev/null || echo "")
+        fi
+        local check_pattern="${exec_name:-$app_name}"
+        if pgrep -x "$check_pattern" > /dev/null 2>&1; then
             running_apps+=("$app_name")
         fi
 
@@ -75,18 +135,31 @@ batch_uninstall_applications() {
             sudo_apps+=("$app_name")
         fi
 
-        # Calculate size for summary
-        local app_size_kb=$(du -sk "$app_path" 2> /dev/null | awk '{print $1}' || echo "0")
+        # Calculate size for summary (including system files)
+        local app_size_kb=$(get_path_size_kb "$app_path")
         local related_files=$(find_app_files "$bundle_id" "$app_name")
         local related_size_kb=$(calculate_total_size "$related_files")
-        local total_kb=$((app_size_kb + related_size_kb))
+        # system_files is a newline-separated string, not an array
+        # shellcheck disable=SC2178,SC2128
+        local system_files=$(find_app_system_files "$bundle_id" "$app_name")
+        # shellcheck disable=SC2128
+        local system_size_kb=$(calculate_total_size "$system_files")
+        local total_kb=$((app_size_kb + related_size_kb + system_size_kb))
         ((total_estimated_size += total_kb))
 
+        # Check if system files require sudo
+        # shellcheck disable=SC2128
+        if [[ -n "$system_files" ]]; then
+            sudo_apps+=("$app_name")
+        fi
+
         # Store details for later use
-        # Base64 encode related_files to handle multi-line data safely (single line)
+        # Base64 encode file lists to handle multi-line data safely (single line)
         local encoded_files
         encoded_files=$(printf '%s' "$related_files" | base64 | tr -d '\n')
-        app_details+=("$app_name|$app_path|$bundle_id|$total_kb|$encoded_files")
+        local encoded_system_files
+        encoded_system_files=$(printf '%s' "$system_files" | base64 | tr -d '\n')
+        app_details+=("$app_name|$app_path|$bundle_id|$total_kb|$encoded_files|$encoded_system_files")
     done
 
     # Format size display (convert KB to bytes for bytes_to_human())
@@ -94,15 +167,16 @@ batch_uninstall_applications() {
 
     # Display detailed file list for each app before confirmation
     echo ""
-    echo -e "${PURPLE}Files to be removed:${NC}"
+    echo -e "${PURPLE_BOLD}Files to be removed:${NC}"
     echo ""
     for detail in "${app_details[@]}"; do
-        IFS='|' read -r app_name app_path bundle_id total_kb encoded_files <<< "$detail"
+        IFS='|' read -r app_name app_path bundle_id total_kb encoded_files encoded_system_files <<< "$detail"
         local related_files=$(decode_file_list "$encoded_files" "$app_name")
+        local system_files=$(decode_file_list "$encoded_system_files" "$app_name")
         local app_size_display=$(bytes_to_human "$((total_kb * 1024))")
 
         echo -e "${BLUE}${ICON_CONFIRM}${NC} ${app_name} ${GRAY}(${app_size_display})${NC}"
-        echo -e "  ${GREEN}${ICON_SUCCESS}${NC} $(echo "$app_path" | sed "s|$HOME|~|")"
+        echo -e "  ${GREEN}${ICON_SUCCESS}${NC} ${app_path/$HOME/~}"
 
         # Show related files (limit to 5 most important ones for brevity)
         local file_count=0
@@ -110,16 +184,28 @@ batch_uninstall_applications() {
         while IFS= read -r file; do
             if [[ -n "$file" && -e "$file" ]]; then
                 if [[ $file_count -lt $max_files ]]; then
-                    echo -e "  ${GREEN}${ICON_SUCCESS}${NC} $(echo "$file" | sed "s|$HOME|~|")"
+                    echo -e "  ${GREEN}${ICON_SUCCESS}${NC} ${file/$HOME/~}"
                 fi
                 ((file_count++))
             fi
         done <<< "$related_files"
 
+        # Show system files
+        local sys_file_count=0
+        while IFS= read -r file; do
+            if [[ -n "$file" && -e "$file" ]]; then
+                if [[ $sys_file_count -lt $max_files ]]; then
+                    echo -e "  ${BLUE}${ICON_SOLID}${NC} System: $file"
+                fi
+                ((sys_file_count++))
+            fi
+        done <<< "$system_files"
+
         # Show count of remaining files if truncated
-        if [[ $file_count -gt $max_files ]]; then
-            local remaining=$((file_count - max_files))
-            echo -e "  ${GRAY}  ... and ${remaining} more files${NC}"
+        local total_hidden=$((file_count > max_files ? file_count - max_files : 0))
+        ((total_hidden += sys_file_count > max_files ? sys_file_count - max_files : 0))
+        if [[ $total_hidden -gt 0 ]]; then
+            echo -e "  ${GRAY}  ... and ${total_hidden} more files${NC}"
         fi
     done
 
@@ -189,14 +275,24 @@ batch_uninstall_applications() {
     local -a failed_items=()
     local -a success_items=()
     for detail in "${app_details[@]}"; do
-        IFS='|' read -r app_name app_path bundle_id total_kb encoded_files <<< "$detail"
+        IFS='|' read -r app_name app_path bundle_id total_kb encoded_files encoded_system_files <<< "$detail"
         local related_files=$(decode_file_list "$encoded_files" "$app_name")
+        local system_files=$(decode_file_list "$encoded_system_files" "$app_name")
         local reason=""
         local needs_sudo=false
         [[ ! -w "$(dirname "$app_path")" || "$(get_file_owner "$app_path")" == "root" ]] && needs_sudo=true
+
+        # Stop Launch Agents and Daemons before removal
+        local has_system_files="false"
+        [[ -n "$system_files" ]] && has_system_files="true"
+        stop_launch_services "$bundle_id" "$has_system_files"
+
+        # Force quit app if still running
         if ! force_kill_app "$app_name" "$app_path"; then
             reason="still running"
         fi
+
+        # Remove the application
         if [[ -z "$reason" ]]; then
             if [[ "$needs_sudo" == true ]]; then
                 safe_sudo_remove "$app_path" || reason="remove failed"
@@ -204,12 +300,14 @@ batch_uninstall_applications() {
                 safe_remove "$app_path" true || reason="remove failed"
             fi
         fi
+
+        # Remove user-level and system-level files
         if [[ -z "$reason" ]]; then
-            local files_removed=0
-            while IFS= read -r file; do
-                [[ -n "$file" && -e "$file" ]] || continue
-                safe_remove "$file" true && ((files_removed++)) || true
-            done <<< "$related_files"
+            # Remove user-level files
+            remove_file_list "$related_files" "false" > /dev/null
+            # Remove system-level files (requires sudo)
+            remove_file_list "$system_files" "true" > /dev/null
+
             ((total_size_freed += total_kb))
             ((success_count++))
             ((files_cleaned++))

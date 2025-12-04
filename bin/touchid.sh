@@ -9,8 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIB_DIR="$(cd "$SCRIPT_DIR/../lib" && pwd)"
 
 # Source common functions
-# shellcheck source=../lib/common.sh
-source "$LIB_DIR/common.sh"
+# shellcheck source=../lib/core/common.sh
+source "$LIB_DIR/core/common.sh"
 
 readonly PAM_SUDO_FILE="/etc/pam.d/sudo"
 readonly PAM_TID_LINE="auth       sufficient     pam_tid.so"

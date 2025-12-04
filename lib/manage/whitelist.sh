@@ -6,23 +6,15 @@ set -euo pipefail
 
 # Get script directory and source dependencies
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
-source "$SCRIPT_DIR/menu_simple.sh"
+source "$SCRIPT_DIR/../core/common.sh"
+source "$SCRIPT_DIR/../ui/menu_simple.sh"
 
 # Config file path
 WHITELIST_CONFIG="$HOME/.config/mole/whitelist"
 
-# Default whitelist patterns (preselected on first run)
-declare -a DEFAULT_WHITELIST_PATTERNS=(
-    "$HOME/Library/Caches/ms-playwright*"
-    "$HOME/.cache/huggingface*"
-    "$HOME/.m2/repository/*"
-    "$HOME/.ollama/models/*"
-    "$HOME/Library/Caches/com.nssurge.surge-mac/*"
-    "$HOME/Library/Application Support/com.nssurge.surge-mac/*"
-    "$HOME/Library/Caches/org.R-project.R/R/renv/*"
-    "FINDER_METADATA"
-)
+# Default whitelist patterns defined in lib/core/common.sh:
+# - DEFAULT_WHITELIST_PATTERNS
+# - FINDER_METADATA_SENTINEL
 
 # Save whitelist patterns to config
 save_whitelist_patterns() {
@@ -131,8 +123,9 @@ Podman container cache|$HOME/.local/share/containers/cache/*|container_cache
 Font cache|$HOME/Library/Caches/com.apple.FontRegistry/*|system_cache
 Spotlight metadata cache|$HOME/Library/Caches/com.apple.spotlight/*|system_cache
 CloudKit cache|$HOME/Library/Caches/CloudKit/*|system_cache
-Finder metadata (.DS_Store)|FINDER_METADATA|system_cache
 EOF
+    # Add FINDER_METADATA with constant reference
+    echo "Finder metadata (.DS_Store)|$FINDER_METADATA_SENTINEL|system_cache"
 }
 
 patterns_equivalent() {
@@ -149,8 +142,10 @@ load_whitelist() {
 
     if [[ -f "$WHITELIST_CONFIG" ]]; then
         while IFS= read -r line; do
-            line="${line#${line%%[![:space:]]*}}"
-            line="${line%${line##*[![:space:]]}}"
+            # shellcheck disable=SC2295
+            line="${line#"${line%%[![:space:]]*}"}"
+            # shellcheck disable=SC2295
+            line="${line%"${line##*[![:space:]]}"}"
             [[ -z "$line" || "$line" =~ ^# ]] && continue
             patterns+=("$line")
         done < "$WHITELIST_CONFIG"
@@ -221,6 +216,23 @@ manage_whitelist_categories() {
 
         ((index++))
     done < <(get_all_cache_items)
+
+    # Identify custom patterns (not in predefined list)
+    local -a custom_patterns=()
+    if [[ ${#CURRENT_WHITELIST_PATTERNS[@]} -gt 0 ]]; then
+        for current_pattern in "${CURRENT_WHITELIST_PATTERNS[@]}"; do
+            local is_predefined=false
+            for predefined_pattern in "${cache_patterns[@]}"; do
+                if patterns_equivalent "$current_pattern" "$predefined_pattern"; then
+                    is_predefined=true
+                    break
+                fi
+            done
+            if [[ "$is_predefined" == "false" ]]; then
+                custom_patterns+=("$current_pattern")
+            fi
+        done
+    fi
 
     # Prioritize already-selected items to appear first
     local -a selected_cache_items=()
@@ -293,16 +305,34 @@ manage_whitelist_categories() {
         done
     fi
 
-    # Save to whitelist config (bash 3.2 + set -u safe)
+    # Merge custom patterns with selected patterns
+    local -a all_patterns=()
     if [[ ${#selected_patterns[@]} -gt 0 ]]; then
-        save_whitelist_patterns "${selected_patterns[@]}"
+        all_patterns=("${selected_patterns[@]}")
+    fi
+    if [[ ${#custom_patterns[@]} -gt 0 ]]; then
+        for custom_pattern in "${custom_patterns[@]}"; do
+            all_patterns+=("$custom_pattern")
+        done
+    fi
+
+    # Save to whitelist config (bash 3.2 + set -u safe)
+    if [[ ${#all_patterns[@]} -gt 0 ]]; then
+        save_whitelist_patterns "${all_patterns[@]}"
     else
         save_whitelist_patterns
     fi
 
-    print_summary_block "success" \
-        "Protected ${#selected_patterns[@]} cache(s)" \
-        "Saved to ${WHITELIST_CONFIG}"
+    local total_protected=$((${#selected_patterns[@]} + ${#custom_patterns[@]}))
+    local -a summary_lines=()
+    if [[ ${#custom_patterns[@]} -gt 0 ]]; then
+        summary_lines+=("Protected ${#selected_patterns[@]} predefined + ${#custom_patterns[@]} custom patterns")
+    else
+        summary_lines+=("Protected ${total_protected} cache(s)")
+    fi
+    summary_lines+=("Saved to ${WHITELIST_CONFIG}")
+
+    print_summary_block "success" "${summary_lines[@]}"
     printf '\n'
 }
 

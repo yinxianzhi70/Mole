@@ -39,7 +39,7 @@ fi; }
 # Verbosity (0 = quiet, 1 = verbose)
 VERBOSE=1
 
-# Icons (duplicated from lib/common.sh - necessary as install.sh runs standalone)
+# Icons (duplicated from lib/core/common.sh - necessary as install.sh runs standalone)
 readonly ICON_SUCCESS="✓"
 readonly ICON_ADMIN="●"
 readonly ICON_CONFIRM="◎"
@@ -349,7 +349,7 @@ install_files() {
 # Verify installation
 verify_installation() {
 
-    if [[ -x "$INSTALL_DIR/mole" ]] && [[ -f "$CONFIG_DIR/lib/common.sh" ]]; then
+    if [[ -x "$INSTALL_DIR/mole" ]] && [[ -f "$CONFIG_DIR/lib/core/common.sh" ]]; then
 
         # Test if mole command works
         if "$INSTALL_DIR/mole" --help > /dev/null 2>&1; then
@@ -522,9 +522,9 @@ perform_update() {
     if command -v brew > /dev/null 2>&1 && brew list mole > /dev/null 2>&1; then
         # Try to use shared function if available (when running from installed Mole)
         resolve_source_dir 2> /dev/null || true
-        if [[ -f "$SOURCE_DIR/lib/common.sh" ]]; then
+        if [[ -f "$SOURCE_DIR/lib/core/common.sh" ]]; then
             # shellcheck disable=SC1090,SC1091
-            source "$SOURCE_DIR/lib/common.sh"
+            source "$SOURCE_DIR/lib/core/common.sh"
             update_via_homebrew "$VERSION"
         else
             # Fallback: inline implementation

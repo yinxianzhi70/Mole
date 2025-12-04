@@ -6,8 +6,8 @@ const (
 	maxEntries            = 30
 	maxLargeFiles         = 30
 	barWidth              = 24
-	minLargeFileSize      = 100 << 20 // 100 MB
-	defaultViewport       = 12        // Default viewport when terminal height is unknown
+	minLargeFileSize      = 100 << 20          // 100 MB
+	defaultViewport       = 12                 // Default viewport when terminal height is unknown
 	overviewCacheTTL      = 7 * 24 * time.Hour // 7 days
 	overviewCacheFile     = "overview_sizes.json"
 	duTimeout             = 60 * time.Second // Increased for large directories
@@ -223,12 +223,14 @@ var skipExtensions = map[string]bool{
 var spinnerFrames = []string{"|", "/", "-", "\\", "|", "/", "-", "\\"}
 
 const (
-	colorPurple = "\033[0;35m"
-	colorGray   = "\033[0;90m"
-	colorRed    = "\033[0;31m"
-	colorYellow = "\033[1;33m"
-	colorGreen  = "\033[0;32m"
-	colorCyan   = "\033[0;36m"
-	colorReset  = "\033[0m"
-	colorBold   = "\033[1m"
+	colorPurple     = "\033[0;35m"
+	colorPurpleBold = "\033[1;35m"
+	colorGray       = "\033[0;90m"
+	colorRed        = "\033[0;31m"
+	colorYellow     = "\033[0;33m"
+	colorGreen      = "\033[0;32m"
+	colorBlue       = "\033[0;34m"
+	colorCyan       = "\033[0;36m"
+	colorReset      = "\033[0m"
+	colorBold       = "\033[1m"
 )

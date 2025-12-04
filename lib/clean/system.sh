@@ -7,49 +7,57 @@ set -euo pipefail
 # Deep system cleanup (requires sudo)
 clean_deep_system() {
     # Clean old system caches
-    safe_sudo_find_delete "/Library/Caches" "*.cache" "$MOLE_TEMP_FILE_AGE_DAYS" "f"
-    safe_sudo_find_delete "/Library/Caches" "*.tmp" "$MOLE_TEMP_FILE_AGE_DAYS" "f"
-    safe_sudo_find_delete "/Library/Caches" "*.log" "$MOLE_LOG_AGE_DAYS" "f"
+    safe_sudo_find_delete "/Library/Caches" "*.cache" "$MOLE_TEMP_FILE_AGE_DAYS" "f" || true
+    safe_sudo_find_delete "/Library/Caches" "*.tmp" "$MOLE_TEMP_FILE_AGE_DAYS" "f" || true
+    safe_sudo_find_delete "/Library/Caches" "*.log" "$MOLE_LOG_AGE_DAYS" "f" || true
 
     # Clean old temp files
     local tmp_cleaned=0
-    local tmp_count=$(sudo find /tmp -type f -mtime +"${MOLE_TEMP_FILE_AGE_DAYS}" 2> /dev/null | wc -l | tr -d ' ')
+    local tmp_count=$(sudo command find /tmp -type f -mtime +"${MOLE_TEMP_FILE_AGE_DAYS}" 2> /dev/null | wc -l | tr -d ' ')
     if [[ "$tmp_count" -gt 0 ]]; then
-        safe_sudo_find_delete "/tmp" "*" "${MOLE_TEMP_FILE_AGE_DAYS}" "f"
+        safe_sudo_find_delete "/tmp" "*" "${MOLE_TEMP_FILE_AGE_DAYS}" "f" || true
         tmp_cleaned=1
     fi
-    local var_tmp_count=$(sudo find /var/tmp -type f -mtime +"${MOLE_TEMP_FILE_AGE_DAYS}" 2> /dev/null | wc -l | tr -d ' ')
+    local var_tmp_count=$(sudo command find /var/tmp -type f -mtime +"${MOLE_TEMP_FILE_AGE_DAYS}" 2> /dev/null | wc -l | tr -d ' ')
     if [[ "$var_tmp_count" -gt 0 ]]; then
-        safe_sudo_find_delete "/var/tmp" "*" "${MOLE_TEMP_FILE_AGE_DAYS}" "f"
+        safe_sudo_find_delete "/var/tmp" "*" "${MOLE_TEMP_FILE_AGE_DAYS}" "f" || true
         tmp_cleaned=1
     fi
     [[ $tmp_cleaned -eq 1 ]] && log_success "Old system temp files (${MOLE_TEMP_FILE_AGE_DAYS}+ days)"
 
     # Clean crash reports
-    safe_sudo_find_delete "/Library/Logs/DiagnosticReports" "*" "$MOLE_CRASH_REPORT_AGE_DAYS" "f"
+    safe_sudo_find_delete "/Library/Logs/DiagnosticReports" "*" "$MOLE_CRASH_REPORT_AGE_DAYS" "f" || true
     log_success "Old system crash reports (${MOLE_CRASH_REPORT_AGE_DAYS}+ days)"
 
     # Clean system logs
-    safe_sudo_find_delete "/var/log" "*.log" "$MOLE_LOG_AGE_DAYS" "f"
-    safe_sudo_find_delete "/var/log" "*.gz" "$MOLE_LOG_AGE_DAYS" "f"
+    safe_sudo_find_delete "/var/log" "*.log" "$MOLE_LOG_AGE_DAYS" "f" || true
+    safe_sudo_find_delete "/var/log" "*.gz" "$MOLE_LOG_AGE_DAYS" "f" || true
     log_success "Old system logs (${MOLE_LOG_AGE_DAYS}+ days)"
 
-    # Clean Library Updates safely - iterate and delete individual items
+    # Clean Library Updates safely - skip if SIP is enabled to avoid error messages
+    # SIP-protected files in /Library/Updates cannot be deleted even with sudo
     if [[ -d "/Library/Updates" && ! -L "/Library/Updates" ]]; then
-        local updates_cleaned=0
-        while IFS= read -r -d '' item; do
-            # Skip system-protected files (restricted flag)
-            local item_flags
-            item_flags=$(stat -f%Sf "$item" 2> /dev/null || echo "")
-            if [[ "$item_flags" == *"restricted"* ]]; then
-                continue
-            fi
+        if is_sip_enabled; then
+            # SIP is enabled, skip /Library/Updates entirely to avoid error messages
+            # These files are system-protected and cannot be removed
+            : # No-op, silently skip
+        else
+            # SIP is disabled, attempt cleanup with restricted flag check
+            local updates_cleaned=0
+            while IFS= read -r -d '' item; do
+                # Skip system-protected files (restricted flag)
+                local item_flags
+                item_flags=$(command stat -f%Sf "$item" 2> /dev/null || echo "")
+                if [[ "$item_flags" == *"restricted"* ]]; then
+                    continue
+                fi
 
-            if safe_sudo_remove "$item"; then
-                ((updates_cleaned++))
-            fi
-        done < <(find /Library/Updates -mindepth 1 -maxdepth 1 -print0 2> /dev/null)
-        [[ $updates_cleaned -gt 0 ]] && log_success "System library updates"
+                if safe_sudo_remove "$item"; then
+                    ((updates_cleaned++))
+                fi
+            done < <(command find /Library/Updates -mindepth 1 -maxdepth 1 -print0 2> /dev/null)
+            [[ $updates_cleaned -gt 0 ]] && log_success "System library updates"
+        fi
     fi
 
     # Clean orphaned cask records (delegated to clean_brew module)
@@ -95,7 +103,7 @@ clean_time_machine_failed_backups() {
             fi
         fi
 
-        local fs_type=$(df -T "$volume" 2> /dev/null | tail -1 | awk '{print $2}')
+        local fs_type=$(command df -T "$volume" 2> /dev/null | tail -1 | awk '{print $2}')
         case "$fs_type" in
             nfs | smbfs | afpfs | cifs | webdav) continue ;;
         esac
@@ -115,7 +123,7 @@ clean_time_machine_failed_backups() {
                     continue
                 fi
 
-                local size_kb=$(du -sk "$inprogress_file" 2> /dev/null | awk '{print $1}' || echo "0")
+                local size_kb=$(get_path_size_kb "$inprogress_file")
                 if [[ "$size_kb" -gt 0 ]]; then
                     local backup_name=$(basename "$inprogress_file")
 
@@ -142,7 +150,7 @@ clean_time_machine_failed_backups() {
                         note_activity
                     fi
                 fi
-            done < <(find "$backupdb_dir" -maxdepth 3 -type d \( -name "*.inProgress" -o -name "*.inprogress" \) 2> /dev/null || true)
+            done < <(command find "$backupdb_dir" -maxdepth 3 -type d \( -name "*.inProgress" -o -name "*.inprogress" \) 2> /dev/null || true)
         fi
 
         # APFS style backups (.backupbundle or .sparsebundle)
@@ -167,7 +175,7 @@ clean_time_machine_failed_backups() {
                         continue
                     fi
 
-                    local size_kb=$(du -sk "$inprogress_file" 2> /dev/null | awk '{print $1}' || echo "0")
+                    local size_kb=$(get_path_size_kb "$inprogress_file")
                     if [[ "$size_kb" -gt 0 ]]; then
                         local backup_name=$(basename "$inprogress_file")
 
@@ -192,7 +200,7 @@ clean_time_machine_failed_backups() {
                             note_activity
                         fi
                     fi
-                done < <(find "$mounted_path" -maxdepth 3 -type d \( -name "*.inProgress" -o -name "*.inprogress" \) 2> /dev/null || true)
+                done < <(command find "$mounted_path" -maxdepth 3 -type d \( -name "*.inProgress" -o -name "*.inprogress" \) 2> /dev/null || true)
             fi
         done
     done

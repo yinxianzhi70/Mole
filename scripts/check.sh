@@ -69,7 +69,7 @@ TOTAL_CHECKS=0
 
 # Check 1: Keyboard input handling (restored to 1s for reliability)
 ((TOTAL_CHECKS++))
-if grep -q "read -r -s -n 1 -t 1" lib/common.sh; then
+if grep -q "read -r -s -n 1 -t 1" lib/core/common.sh; then
     echo -e "${GREEN}  ✓ Keyboard timeout properly configured (1s)${NC}"
     ((OPTIMIZATION_SCORE++))
 else
@@ -78,7 +78,7 @@ fi
 
 # Check 2: Single-pass drain_pending_input
 ((TOTAL_CHECKS++))
-DRAIN_PASSES=$(grep -c "while IFS= read -r -s -n 1" lib/common.sh || echo 0)
+DRAIN_PASSES=$(grep -c "while IFS= read -r -s -n 1" lib/core/common.sh || echo 0)
 if [[ $DRAIN_PASSES -eq 1 ]]; then
     echo -e "${GREEN}  ✓ drain_pending_input optimized (single-pass)${NC}"
     ((OPTIMIZATION_SCORE++))
@@ -88,7 +88,7 @@ fi
 
 # Check 3: Log rotation once per session
 ((TOTAL_CHECKS++))
-if grep -q "rotate_log_once" lib/common.sh && ! grep "rotate_log()" lib/common.sh | grep -v "rotate_log_once" > /dev/null 2>&1; then
+if grep -q "rotate_log_once" lib/core/common.sh && ! grep "rotate_log()" lib/core/common.sh | grep -v "rotate_log_once" > /dev/null 2>&1; then
     echo -e "${GREEN}  ✓ Log rotation optimized (once per session)${NC}"
     ((OPTIMIZATION_SCORE++))
 else

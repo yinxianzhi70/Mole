@@ -92,8 +92,33 @@ clean_productivity_apps() {
 }
 
 # Clean music and media players
+# Note: Spotify cache is protected by default (may contain offline music)
+# Users can override via whitelist settings
 clean_media_players() {
-    safe_clean ~/Library/Caches/com.spotify.client/* "Spotify cache"
+    # Spotify cache protection: check for offline music indicators
+    local spotify_cache="$HOME/Library/Caches/com.spotify.client"
+    local spotify_data="$HOME/Library/Application Support/Spotify"
+    local has_offline_music=false
+
+    # Check for offline music database or large cache (>500MB)
+    if [[ -f "$spotify_data/PersistentCache/Storage/offline.bnk" ]] ||
+        [[ -d "$spotify_data/PersistentCache/Storage" && -n "$(find "$spotify_data/PersistentCache/Storage" -type f -name "*.file" 2> /dev/null | head -1)" ]]; then
+        has_offline_music=true
+    elif [[ -d "$spotify_cache" ]]; then
+        local cache_size_kb
+        cache_size_kb=$(get_path_size_kb "$spotify_cache")
+        # Large cache (>500MB) likely contains offline music
+        if [[ $cache_size_kb -ge 512000 ]]; then
+            has_offline_music=true
+        fi
+    fi
+
+    if [[ "$has_offline_music" == "true" ]]; then
+        echo -e "  ${YELLOW}${ICON_WARNING}${NC} Spotify cache protected (offline music detected)"
+        note_activity
+    else
+        safe_clean ~/Library/Caches/com.spotify.client/* "Spotify cache"
+    fi
     safe_clean ~/Library/Caches/com.apple.Music "Apple Music cache"
     safe_clean ~/Library/Caches/com.apple.podcasts "Apple Podcasts cache"
     safe_clean ~/Library/Caches/com.apple.TV/* "Apple TV cache"

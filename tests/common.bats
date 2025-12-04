@@ -30,13 +30,13 @@ teardown() {
 }
 
 @test "mo_spinner_chars returns default sequence when unset" {
-    result="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; mo_spinner_chars")"
+    result="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; mo_spinner_chars")"
     [ "$result" = "|/-\\" ]
 }
 
 @test "mo_spinner_chars respects MO_SPINNER_CHARS override" {
     export MO_SPINNER_CHARS="abcd"
-    result="$(HOME="$HOME" MO_SPINNER_CHARS="$MO_SPINNER_CHARS" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; mo_spinner_chars")"
+    result="$(HOME="$HOME" MO_SPINNER_CHARS="$MO_SPINNER_CHARS" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; mo_spinner_chars")"
     [ "$result" = "abcd" ]
 }
 
@@ -45,19 +45,19 @@ teardown() {
     if [[ "$(uname -m)" == "arm64" ]]; then
         expected="Apple Silicon"
     fi
-    result="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; detect_architecture")"
+    result="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; detect_architecture")"
     [ "$result" = "$expected" ]
 }
 
 @test "get_free_space returns a non-empty value" {
-    result="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; get_free_space")"
+    result="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; get_free_space")"
     [[ -n "$result" ]]
 }
 
 @test "log_info prints message and appends to log file" {
     local message="Informational message from test"
     local stdout_output
-    stdout_output="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; log_info '$message'")"
+    stdout_output="$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; log_info '$message'")"
     [[ "$stdout_output" == *"$message"* ]]
 
     local log_file="$HOME/.config/mole/mole.log"
@@ -69,7 +69,7 @@ teardown() {
     local message="Something went wrong"
     local stderr_file="$HOME/log_error_stderr.txt"
 
-    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; log_error '$message' 1>/dev/null 2>'$stderr_file'"
+    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; log_error '$message' 1>/dev/null 2>'$stderr_file'"
 
     [[ -s "$stderr_file" ]]
     grep -q "$message" "$stderr_file"
@@ -86,18 +86,18 @@ teardown() {
     dd if=/dev/zero of="$log_file" bs=1024 count=1100 2> /dev/null
 
     # First call should rotate
-    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'"
+    HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'"
     [[ -f "${log_file}.old" ]]
 
     # Verify MOLE_LOG_ROTATED was set (rotation happened)
-    result=$(HOME="$HOME" MOLE_LOG_ROTATED=1 bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; echo \$MOLE_LOG_ROTATED")
+    result=$(HOME="$HOME" MOLE_LOG_ROTATED=1 bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; echo \$MOLE_LOG_ROTATED")
     [[ "$result" == "1" ]]
 }
 
 @test "drain_pending_input clears stdin buffer" {
     # Test that drain_pending_input doesn't hang (using background job with timeout)
     result=$(
-        (echo -e "test\ninput" | HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; drain_pending_input; echo done") &
+        (echo -e "test\ninput" | HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; drain_pending_input; echo done") &
         pid=$!
         sleep 2
         if kill -0 "$pid" 2> /dev/null; then
@@ -114,7 +114,7 @@ teardown() {
 @test "bytes_to_human converts byte counts into readable units" {
     output="$(
         HOME="$HOME" bash --noprofile --norc << 'EOF'
-source "$PROJECT_ROOT/lib/common.sh"
+source "$PROJECT_ROOT/lib/core/common.sh"
 bytes_to_human 512
 bytes_to_human 2048
 bytes_to_human $((5 * 1024 * 1024))
@@ -135,7 +135,7 @@ EOF
 
 @test "create_temp_file and create_temp_dir are tracked and cleaned" {
     HOME="$HOME" bash --noprofile --norc << 'EOF'
-source "$PROJECT_ROOT/lib/common.sh"
+source "$PROJECT_ROOT/lib/core/common.sh"
 create_temp_file > "$HOME/temp_file_path.txt"
 create_temp_dir > "$HOME/temp_dir_path.txt"
 cleanup_temp_files
@@ -151,20 +151,20 @@ EOF
 
 @test "should_protect_data protects system and critical apps" {
     # System apps should be protected
-    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; should_protect_data 'com.apple.Safari' && echo 'protected' || echo 'not-protected'")
+    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; should_protect_data 'com.apple.Safari' && echo 'protected' || echo 'not-protected'")
     [ "$result" = "protected" ]
 
     # Critical network apps should be protected
-    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; should_protect_data 'com.clash.app' && echo 'protected' || echo 'not-protected'")
+    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; should_protect_data 'com.clash.app' && echo 'protected' || echo 'not-protected'")
     [ "$result" = "protected" ]
 
     # Regular apps should not be protected
-    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; should_protect_data 'com.example.RegularApp' && echo 'protected' || echo 'not-protected'")
+    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; should_protect_data 'com.example.RegularApp' && echo 'protected' || echo 'not-protected'")
     [ "$result" = "not-protected" ]
 }
 
 @test "print_summary_block formats output correctly" {
-    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/common.sh'; print_summary_block 'success' 'Test Summary' 'Detail 1' 'Detail 2'")
+    result=$(HOME="$HOME" bash --noprofile --norc -c "source '$PROJECT_ROOT/lib/core/common.sh'; print_summary_block 'success' 'Test Summary' 'Detail 1' 'Detail 2'")
     [[ "$result" == *"Test Summary"* ]]
     [[ "$result" == *"Detail 1"* ]]
     [[ "$result" == *"Detail 2"* ]]
@@ -173,7 +173,7 @@ EOF
 @test "start_inline_spinner and stop_inline_spinner work in non-TTY" {
     # Should not hang in non-interactive mode
     result=$(HOME="$HOME" bash --noprofile --norc << 'EOF'
-source "$PROJECT_ROOT/lib/common.sh"
+source "$PROJECT_ROOT/lib/core/common.sh"
 MOLE_SPINNER_PREFIX="  " start_inline_spinner "Testing..."
 sleep 0.1
 stop_inline_spinner

@@ -44,7 +44,7 @@ brew() {
   esac
 }
 export -f brew start_inline_spinner stop_inline_spinner
-source "$PROJECT_ROOT/lib/common.sh"
+source "$PROJECT_ROOT/lib/core/common.sh"
 update_via_homebrew "1.7.9"
 EOF
 

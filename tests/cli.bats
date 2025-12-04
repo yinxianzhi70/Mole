@@ -46,8 +46,11 @@ setup() {
 }
 
 @test "touchid status reports current configuration" {
+    # Don't test actual Touch ID config (system-dependent, may trigger prompts)
+    # Just verify the command exists and can run
     run env HOME="$HOME" "$PROJECT_ROOT/mole" touchid status
     [ "$status" -eq 0 ]
+    # Should output either "enabled" or "not configured" message
     [[ "$output" == *"Touch ID"* ]]
 }
 
